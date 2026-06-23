@@ -1,5 +1,15 @@
 # CLAUDE.md
 
+## 작업 규칙
+- 동일 파일 반복 읽기 금지 (최대 1회)
+- 큰 파일(500줄+)은 grep/sed로 필요 부분만 추출
+- 코드 작성 전 과도한 재검토 금지
+- 계획 → 실행 → 검증 순서로 진행
+- 작업 요청 시 반드시 세부 작업으로 쪼개고, 하나씩 적용 후 다음 작업으로 진행
+- HTML / CSS / JS 파일 분리 유지 (prototype.html → prototype.html + prototype.css + prototype.js)
+
+---
+
 ## 프로젝트 개요
 방탈출 동아리 '_log(로그)'의 운영 통합 웹앱.
 기존 카카오톡 공지 + 구글폼 + 구글시트로 분산된 운영을
@@ -26,17 +36,21 @@
 ## DB 테이블 목록
 - users: 부원 정보 (id, name, email, role, warning_count)
 - events: 방탈출 일정 (id, date, place)
-- themes: 테마 (id, event_id, name, max_members, price)
+- themes: 테마 (id, event_id, name, max_members, price, meet_time, start_time)
 - applications: 테마 신청 (id, user_id, event_id, theme_pref_1, theme_pref_2, theme_pref_3, is_paid)
 - assignments: 배정 결과 (id, user_id, theme_id, confirmed)
 - attendance: 출석 (id, user_id, event_id, theme_id, attended, certified_at)
-- reviews: 후기 (id, user_id, theme_id, rating, is_cleared, escape_time, content)
-- notices: 공지 (id, title, content, created_at)
+- reviews: 후기 (id, user_id, theme_id, rating, is_cleared, escape_time, content, horror_level, difficulty_level)
+- notices: 공지 (id, title, content, created_at, is_read_by[])
 - afterparties: 뒷풀이 일정 (id, event_id, place, max_members, estimated_price)
 - afterparty_applications: 뒷풀이 신청 (id, afterparty_id, user_id, is_attending)
-- flash_meetings: 번개모임 인증 (id, user_id, place, theme_name, played_at, photo_url, is_cleared, status, reject_reason)
+- flash_meetings: 번개모임 (id, user_id, title, place, theme_name, type[방탈출|비방탈출], played_at, photo_url, is_cleared, status, reject_reason, max_members)
 - warnings: 경고 내역 (id, user_id, reason, created_at, issued_by)
 - mileage: 마일리지 내역 (id, user_id, amount, reason, created_at)
+- coins: 코인 내역 (id, user_id, amount, reason, created_at)
+- nest_kirogie: 기로기 상태 (id, user_id, generation, room_count, current_skin, created_at)
+- shop_items: 상점 아이템 (id, name, type[skin|ticket|goods], price, description, image_url)
+- user_items: 보유 아이템 (id, user_id, item_id, purchased_at)
 
 ---
 
@@ -71,24 +85,55 @@
 ---
 
 ## 화면 구조
-### 부원
-- 로그인 화면
-- 홈 탭: 공지, 신청 중인 정기모임, 모집 중인 번개, 해야 할 일
-- 정기모임 탭: 테마 신청, 배정 확인, 뒷풀이 신청, 후기 작성, 출석 인증
-- 번개 탭: 번개 목록, 번개 등록, 번개 인증
-- 아카이브 탭: 방탈출 랭킹, 후기 모음, 정모/번개 기록
-- MY 탭: 프로필, 출석 이력, 경고 현황, 마일리지, 나의 후기
+### 부원 (4개 탭: 홈 / 모임 / 후기 / 마이)
 
-### 운영진 (admin)
+#### 홈 탭
+- 해야 할 일 팝업 배너 (할 일 있을 때 공지 위에 표시)
+- 공지사항 배너: "확인하지 않은 공지사항이 N건 있습니다" (클릭 → 전체 공지)
+- 다가오는 정기모임 카드 (요약)
+- 모집 중인 번개 목록 (요약)
+
+#### 모임 탭 (정기 / 번개 서브탭)
+**정기 서브탭**
+- 다가오는 정기모임
+  - D-7 이상 전: 희망테마 신청하기 버튼
+  - 테마 확정 전 (D-7 이내): 상세 → "테마 확정 전" 팝업 / 방켓팅 예정 시간 표시 / 비활성 버튼
+  - 테마 확정 + 배정 완료: 상세 → 테마표 / 방켓팅 버튼 + 뒷풀이 버튼
+  - 방켓팅 완료: 상세 → 테마표 / 비활성 버튼 + 뒷풀이 버튼
+  - 운영진: 배정하기 버튼 / 결원 시 재배정하기 버튼
+- 끝난 정기모임: 상세 / 배정 결과 / 테마표 / 사진 / 후기 작성
+- 상세 정보: 제목, 날짜, 위치, 테마표(테마이름·가격·모이는시간·시작시간), 배정표
+
+**번개 서브탭**
+- 다가오는 번개: 신청 / 모집 인원 / 상세 / 번개 올리기 버튼
+  - 필터: 전체 / 방탈출 / 비방탈출 / 모집 마감 안보기
+- 끝난 번개: 상세 / 사진
+  - 필터: 내 모임만 보기 / 방탈출 / 비방탈출
+
+#### 후기 탭
+- 방탈 랭킹: 리뷰 개수 / 평균 평점 / 테마 제목 (더보기)
+- 전체 후기: 정렬 (별점순 / 최신순 / 공포도순 / 난이도순)
+
+#### 마이 탭
+- 전체 방탈출 횟수
+- 기로기 프로필 (꾸미기/스킨 변경)
+- 이번 기수 출석 현황
+- 마일리지
+- 시각화 자료: 장르별 분포 바 차트
+- 세부사항: 경고 현황 / 나의 후기 / 로그아웃
+- 하단 꾸미기 영역: 코인 잔액, 기로기 성장(알→아기→기로기→어른→마스터), 상점(스킨·굿즈·응모권, 코인 사용)
+- 운영진 전용: 부원 관리 (출석·경고·마일리지 부여)
+
+### 운영진 추가 기능
 - 공지 작성
-- 일정 등록 (방탈출 일정 + 테마 + 뒷풀이)
+- 일정 등록 (정기모임 + 테마 + 뒷풀이)
 - 신청자 명단 확인
-- 배정 알고리즘 실행 버튼
+- 배정 알고리즘 실행 / 결원 시 재배정
 - 입금 체크 (토글)
 - 출석 체크
 - 번개 인증 승인/반려
 - 경고 부여 및 관리
-- 마일리지 부여
+- 마일리지 / 코인 부여
 - 기수 연장 대상자 확인
 
 ---
@@ -96,7 +141,7 @@
 ## 폴더 구조
 src/
 
-├── components/       # 재사용 컴포넌트 (Button, Card, StarRating 등)
+├── components/       # 재사용 컴포넌트 (Button, Card, StarRating, KirogieDisplay 등)
 
 ├── pages/
 
@@ -104,19 +149,13 @@ src/
 
 │   ├── Home.jsx
 
-│   ├── Events.jsx
+│   ├── Meetings.jsx        # 정기 + 번개 통합 탭
 
-│   ├── Apply.jsx
-
-│   ├── Afterparty.jsx
-
-│   ├── FlashMeeting.jsx
-
-│   ├── Archive.jsx
+│   ├── Reviews.jsx         # 후기 탭 (랭킹 + 전체 후기)
 
 │   ├── MyPage.jsx
 
-│   ├── Review.jsx
+│   ├── ReviewWrite.jsx     # 후기 작성 모달/페이지
 
 │   └── admin/
 
@@ -134,7 +173,9 @@ src/
 
 │       ├── WarningManage.jsx
 
-│       └── MileageManage.jsx
+│       ├── MileageManage.jsx
+
+│       └── CoinManage.jsx
 
 ├── hooks/            # 커스텀 훅
 
@@ -186,21 +227,32 @@ VITE_SUPABASE_ANON_KEY=
 ---
 
 ## 현재 개발 단계
-[x] 0단계 완료 — HTML/CSS/JS 단일 파일 프로토타입 완성 (`prototype.html`)
+[x] 0단계 완료 — HTML/CSS/JS 파일 분리 프로토타입 완성 (`prototype.html` + `prototype.css` + `prototype.js`)
 [ ] 1단계 진행 예정 — React + Vite 프로젝트 세팅
 
-### 프로토타입 구현 현황 (`prototype.html`)
-목 데이터 기반 단일 파일 프로토타입. 실제 백엔드 없이 모든 주요 화면과 상호작용을 확인 가능.
+### 프로토타입 파일 구조
+- `prototype.html` — HTML 마크업
+- `prototype.css` — 라이트 테마 CSS (CSS Variables 기반)
+- `prototype.js` — 목 데이터 + 상태 관리 + 인터랙션 로직
 
-**구현 완료 화면**
+### 프로토타입 디자인 시스템
+- 배경: `--bg:#edf0fa` (라이트 블루-라벤더)
+- 카드: `--card:#ffffff` + `--border:#e4e8f4`
+- 프라이머리 버튼: `--navy:#1a2a5e` (다크 네이비)
+- 긴급/D-day: `--accent:#e84040` (레드)
+- 탭별 헤더 타이틀: 홈은 로고(_log), 나머지는 탭명
+
+### 프로토타입 구현 현황 (4탭 구조: 홈 / 모임 / 후기 / 마이)
 - 로그인 / 회원가입 / 아이디·비밀번호 찾기
-- 홈 탭: 공지 목록, 해야 할 일, 다가오는 정기모임, 번개 목록
-- 번개 탭: 번개 중 / 번개 완료 서브탭, 상세 펼치기, 신청 모달
-- 정기모임 탭: 1·2·3지망 드롭다운 신청, 배정 결과, 뒷풀이 신청, 후기 작성
-- 아카이브 탭: 방탈 랭킹(전체), 후기 모음(전체), 모임 기록(전체+기수 필터+상세)
-- MY 탭: 프로필 수정, 출석 이력, 마일리지 내역, 경고 내역, 나의 후기
-- 운영진 전용: 공지 작성, 배정하기(부원별 지망 확인+배정 드롭다운), 부원 관리(경고 부여·출석·마일리지 수정)
-- 공통: 최종 확인 알림창, 로그아웃 확인, 토스트 알림, 알림 패널
+- 홈 탭: 할 일 카드(인증하기 버튼), 공지 한 줄 배너, 기로기 프로필 카드(방탈출 횟수·출석·코인), 다가오는 정기모임 요약, 번개모임 썸네일 카드
+- 모임 탭 (정기모임 / 번개모임 세그먼트):
+  - 정기: 신청 열림 → "뒷풀이만 신청" + "정기모임 신청" 2버튼 / 미오픈 → 방켓팅 오픈 예정 회색 버튼
+  - 번개: 신청, 상세 펼침, 번개 등록
+  - 운영진: 배정하기 버튼, 자동 배정 알고리즘
+- 후기 탭: 방탈 랭킹(리뷰 수·평균 평점), 전체 후기(별점순·최신순·공포도순·난이도순 정렬)
+- 마이 탭: 방탈출 횟수, 기로기 프로필+꾸미기, 출석, 마일리지, 경고/나의 후기/로그아웃, 코인 잔액·기로기 성장·상점
+- 운영진 전용: 공지 작성, 배정하기, 부원 관리(경고·출석·마일리지 수정)
+- 공통: 라이트 테마, 최종 확인 알림창, 로그아웃 확인, 토스트 알림, 알림 패널, 스낵 바텀시트
 
 ---
 
